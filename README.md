@@ -42,22 +42,4 @@ AI Tool is a modern web application built with [Vite](https://vitejs.dev/) and R
 4. **Open your browser:**
     Visit [http://localhost:5173](http://localhost:5173) (or the port shown in your terminal).
 
-## Available Scripts
 
-- `npm run dev` — Start the development server
-- `npm run build` — Build for production
-- `npm run preview` — Preview the production build
-- `npm run lint` — Run ESLint
-
-## Customization
-
-- Place static assets in the `public/` folder.
-- Add React components and assets in `src/`.
-
-## License
-
-This project is licensed under the MIT License.
-
----
-
-Feel free to customize this `README.md` as your project evolves!
