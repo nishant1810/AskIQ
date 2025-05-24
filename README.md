@@ -23,7 +23,7 @@ AI Tool is a modern web application built with [Vite](https://vitejs.dev/) and R
 
 1. **Clone the repository:**
     ```sh
-    git clone https://github.com/your-username/AI_Tool.git
+    git clone https://github.com/nishant1810/AskIQ.git
     cd AI_Tool
     ```
 
