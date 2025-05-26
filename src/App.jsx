@@ -2,22 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { URL } from './constants';
 
 const UserIcon = () => (
-  <svg
-    className="w-6 h-6 text-blue-400"
-    fill="currentColor"
-    viewBox="0 0 24 24"
-  >
+  <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
     <circle cx="12" cy="8" r="4" />
     <path d="M6 20c0-3.31 5.33-3.31 6 0" />
   </svg>
 );
 
 const BotIcon = () => (
-  <svg
-    className="w-6 h-6 text-green-400"
-    fill="currentColor"
-    viewBox="0 0 24 24"
-  >
+  <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 24 24">
     <rect x="6" y="7" width="12" height="10" rx="2" ry="2" />
     <circle cx="9" cy="12" r="1" fill="white" />
     <circle cx="15" cy="12" r="1" fill="white" />
@@ -37,7 +29,7 @@ function App() {
   const resultRef = useRef(null);
 
   const saveConversation = (messages) => {
-    const updated = [...conversations, { title: messages[0]?.text, messages }];
+    const updated = [{ title: messages[0]?.text, messages }, ...conversations];
     setConversations(updated);
     localStorage.setItem('askiq_chats', JSON.stringify(updated));
   };
@@ -70,7 +62,7 @@ function App() {
 
       if (activeChatIndex === null) {
         saveConversation(fullChat);
-        setActiveChatIndex(conversations.length);
+        setActiveChatIndex(0); // Top of the stack
       } else {
         const updatedConvs = [...conversations];
         updatedConvs[activeChatIndex].messages = fullChat;
@@ -89,7 +81,7 @@ function App() {
   const loadConversation = (index) => {
     setActiveChatIndex(index);
     setChat(conversations[index].messages);
-    setSidebarOpen(false); // Auto-close sidebar on conversation load for smaller screens
+    setSidebarOpen(false); // Close sidebar on mobile
   };
 
   const startNewChat = () => {
@@ -119,17 +111,9 @@ function App() {
           border-r border-zinc-700 z-40`}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
-          <h1 className="text-xl font-bold">AskIQ</h1>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
-            className="text-zinc-400 hover:text-white transition"
-          >
-            ✕
-          </button>
+          <h1 className="text-xl font-bold text-center w-full">AskIQ</h1>
         </div>
 
-        {/* New Chat button at top */}
         <div className="flex flex-col p-4 space-y-2 border-b border-zinc-700">
           <button
             onClick={startNewChat}
@@ -160,7 +144,6 @@ function App() {
           ))}
         </nav>
 
-        {/* Clear Chats button near bottom */}
         <div className="flex flex-col p-4 space-y-2 border-t border-zinc-700">
           <button
             onClick={clearAllChats}
@@ -175,7 +158,6 @@ function App() {
         </div>
       </aside>
 
-      {/* Overlay for small screens */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
@@ -183,10 +165,10 @@ function App() {
         />
       )}
 
-      {/* Main content area */}
+      {/* Main area */}
       <main className="flex-1 flex flex-col justify-between p-6 ml-0 md:ml-72 transition-all duration-300">
         
-        {/* Hamburger toggle */}
+        {/* Hamburger */}
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Open sidebar"
@@ -207,7 +189,7 @@ function App() {
           </svg>
         </button>
 
-        {/* Chat Display */}
+        {/* Chat Window */}
         <div className="overflow-y-auto flex-1 space-y-4 pr-4 flex flex-col">
           {chat.map((msg, idx) => (
             <div
@@ -227,7 +209,7 @@ function App() {
           <div ref={resultRef} />
         </div>
 
-        {/* Input Area */}
+        {/* Input Box */}
         <div
           className="mt-4 bg-zinc-800 w-full max-w-3xl mx-auto p-1 pr-5 rounded-4xl
             border border-zinc-700 flex h-16"
