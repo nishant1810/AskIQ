@@ -20,8 +20,8 @@ const BotIcon = () => (
   </svg>
 );
 
+// Get date string YYYY-MM-DD
 const getDateKey = (date = new Date()) => date.toISOString().split('T')[0];
-
 const formatDate = (key) => {
   const today = new Date();
   const yesterday = new Date();
@@ -30,6 +30,32 @@ const formatDate = (key) => {
   if (key === getDateKey(today)) return "Today";
   if (key === getDateKey(yesterday)) return "Yesterday";
   return target.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+};
+
+// Component: Code block with copy button
+const CodeBlock = ({ className, children }) => {
+  const code = String(children).trim();
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="relative">
+      <pre className={`${className} rounded-lg overflow-x-auto p-4 bg-zinc-800`}>
+        <code>{code}</code>
+      </pre>
+      <button
+        onClick={copyToClipboard}
+        className="absolute top-2 right-2 bg-zinc-700 text-xs text-white px-2 py-1 rounded hover:bg-zinc-600"
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  );
 };
 
 function App() {
@@ -51,10 +77,7 @@ function App() {
     const now = new Date();
     const timestamp = now.toLocaleString();
     const dateKey = getDateKey(now);
-    const updated = [
-      { title: messages[0]?.text, messages, timestamp, dateKey },
-      ...conversations,
-    ];
+    const updated = [{ title: messages[0]?.text, messages, timestamp, dateKey }, ...conversations];
     setConversations(updated);
     localStorage.setItem('askiq_chats', JSON.stringify(updated));
   };
@@ -91,6 +114,7 @@ function App() {
         setConversations(updatedConvs);
         localStorage.setItem('askiq_chats', JSON.stringify(updatedConvs));
       }
+
     } catch (error) {
       setChat(prev => [...prev, { type: 'bot', text: 'An error occurred. Please try again.' }]);
       console.error(error);
@@ -125,10 +149,8 @@ function App() {
     setConversations(updated);
     localStorage.setItem('askiq_chats', JSON.stringify(updated));
     setLastDeleted({ chat: deleted, index: idx });
-
     clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => setLastDeleted(null), 5000);
-
     if (idx === activeChatIndex) {
       setChat([]);
       setActiveChatIndex(null);
@@ -153,15 +175,14 @@ function App() {
 
   return (
     <div className="flex h-screen bg-zinc-900 text-white overflow-hidden">
+      {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-full bg-zinc-800 text-sm flex flex-col transition-transform duration-300
         ${sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72'} border-r border-zinc-700 z-40`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
           <h1 className="text-xl font-bold text-center w-full">AskIQ</h1>
         </div>
         <div className="flex flex-col p-4 space-y-2 border-b border-zinc-700">
-          <button onClick={startNewChat} className="bg-blue-600 hover:bg-blue-700 rounded py-2 font-semibold">
-            + New Chat
-          </button>
+          <button onClick={startNewChat} className="bg-blue-600 hover:bg-blue-700 rounded py-2 font-semibold">+ New Chat</button>
         </div>
         <div className="p-4">
           <input
@@ -176,9 +197,7 @@ function App() {
           {(() => {
             const groups = {};
             conversations
-              .filter((conv) =>
-                conv.title?.toLowerCase().includes(searchTerm.toLowerCase())
-              )
+              .filter((conv) => conv.title?.toLowerCase().includes(searchTerm.toLowerCase()))
               .forEach((conv, idx) => {
                 if (!groups[conv.dateKey]) groups[conv.dateKey] = [];
                 groups[conv.dateKey].push({ ...conv, index: idx });
@@ -186,9 +205,7 @@ function App() {
             const dateKeys = Object.keys(groups).sort((a, b) => new Date(b) - new Date(a));
             return dateKeys.map((dateKey) => (
               <div key={dateKey}>
-                <div className="text-xs text-zinc-400 font-semibold mb-1 ml-2">
-                  {formatDate(dateKey)}
-                </div>
+                <div className="text-xs text-zinc-400 font-semibold mb-1 ml-2">{formatDate(dateKey)}</div>
                 {groups[dateKey].map((conv) => (
                   <div key={conv.index} className={`flex flex-col group px-3 py-2 rounded-md ${
                     activeChatIndex === conv.index
@@ -204,7 +221,6 @@ function App() {
                           e.stopPropagation();
                           deleteConversation(conv.index);
                         }}
-                        title="Delete"
                         className="text-zinc-400 hover:text-red-500 transition ml-2"
                       >
                         🗑️
@@ -219,21 +235,19 @@ function App() {
         </nav>
         {lastDeleted && (
           <div className="p-4">
-            <button onClick={undoDelete} className="bg-yellow-500 hover:bg-yellow-600 text-black w-full py-2 rounded font-semibold">
-              ↩️ Undo Delete
-            </button>
+            <button onClick={undoDelete} className="bg-yellow-500 hover:bg-yellow-600 text-black w-full py-2 rounded font-semibold">↩️ Undo Delete</button>
           </div>
         )}
         <div className="flex flex-col p-4 space-y-2 border-t border-zinc-700">
-          <button onClick={clearAllChats} className="bg-red-600 hover:bg-red-700 rounded py-2 font-semibold">
-            🗑️ Clear Chats
-          </button>
+          <button onClick={clearAllChats} className="bg-red-600 hover:bg-red-700 rounded py-2 font-semibold">🗑️ Clear Chats</button>
         </div>
         <div className="p-4 text-xs text-zinc-500 border-t border-zinc-700">AskIQ © 2025</div>
       </aside>
 
+      {/* Sidebar overlay for mobile */}
       {sidebarOpen && <div className="fixed inset-0 bg-black opacity-50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
+      {/* Main */}
       <main className="flex-1 flex flex-col justify-between p-6 ml-0 md:ml-72 transition-all duration-300">
         <button onClick={() => setSidebarOpen(true)} className="md:hidden mb-4 text-zinc-400 hover:text-white">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -243,6 +257,7 @@ function App() {
           </svg>
         </button>
 
+        {/* Chat window */}
         <div className="overflow-y-auto flex-1 space-y-4 pr-4 flex flex-col">
           {chat.map((msg, idx) => (
             <div key={idx} className={`flex items-start max-w-3xl ${
@@ -254,7 +269,11 @@ function App() {
               <div className={`p-3 rounded-xl prose prose-invert max-w-full ${
                 msg.type === 'user' ? 'bg-blue-600 text-right' : 'bg-zinc-700 text-left'
               }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                  components={{ code: CodeBlock }}
+                >
                   {msg.text}
                 </ReactMarkdown>
               </div>
@@ -263,6 +282,7 @@ function App() {
           <div ref={resultRef} />
         </div>
 
+        {/* Input */}
         <div className="mt-4 bg-zinc-800 w-full max-w-3xl mx-auto p-1 pr-5 rounded-4xl border border-zinc-700 flex h-16">
           <input
             type="text"
