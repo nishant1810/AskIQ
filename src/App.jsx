@@ -20,7 +20,6 @@ const BotIcon = () => (
   </svg>
 );
 
-// Get date string YYYY-MM-DD
 const getDateKey = (date = new Date()) => date.toISOString().split('T')[0];
 const formatDate = (key) => {
   const today = new Date();
@@ -32,7 +31,6 @@ const formatDate = (key) => {
   return target.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
-// Component: Code block with copy button
 const CodeBlock = ({ className, children }) => {
   const code = String(children).trim();
   const [copied, setCopied] = useState(false);
@@ -67,11 +65,12 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [activeChatIndex, setActiveChatIndex] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [lastDeleted, setLastDeleted] = useState(null);
   const undoTimerRef = useRef(null);
   const resultRef = useRef(null);
+  
 
   const saveConversation = (messages) => {
     const now = new Date();
@@ -89,8 +88,8 @@ function App() {
     setChat(updatedChat);
     setQuestion('');
     setLoading(true);
-
-    const payload = { contents: [{ parts: [{ text: question }] }] };
+    const now = new Date();
+    const payload = { contents: [{ parts: [{  text: `${question}\n(Asked on ${now.toLocaleString()})`}] }] };
 
     try {
       const response = await fetch(URL, {
@@ -177,7 +176,7 @@ function App() {
     <div className="flex h-screen bg-zinc-900 text-white overflow-hidden">
       {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-full bg-zinc-800 text-sm flex flex-col transition-transform duration-300
-        ${sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72'} border-r border-zinc-700 z-40`}>
+        ${sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72'} border-r border-zinc-700 z-40 md:translate-x-0`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
           <h1 className="text-xl font-bold text-center w-full">AskIQ</h1>
         </div>
@@ -241,7 +240,7 @@ function App() {
         <div className="flex flex-col p-4 space-y-2 border-t border-zinc-700">
           <button onClick={clearAllChats} className="bg-red-600 hover:bg-red-700 rounded py-2 font-semibold">🗑️ Clear Chats</button>
         </div>
-        <div className="p-4 text-xs text-zinc-500 border-t border-zinc-700">AskIQ © 2025</div>
+        <div className="p-4 text-xs text-center text-zinc-500 border-t border-zinc-700">AskIQ © 2025</div>
       </aside>
 
       {/* Sidebar overlay for mobile */}
@@ -251,8 +250,8 @@ function App() {
       <main className="flex-1 flex flex-col justify-between p-6 ml-0 md:ml-72 transition-all duration-300">
         <button onClick={() => setSidebarOpen(true)} className="md:hidden mb-4 text-zinc-400 hover:text-white">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
@@ -267,15 +266,14 @@ function App() {
                 {msg.type === 'user' ? <UserIcon /> : <BotIcon />}
               </div>
               <div className={`p-3 rounded-xl prose prose-invert max-w-full ${
-                msg.type === 'user' ? 'bg-blue-600 text-right' : 'bg-zinc-700 text-left'
+                msg.type === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-700'
               }`}>
                 <ReactMarkdown
+                  children={msg.text}
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
                   components={{ code: CodeBlock }}
-                >
-                  {msg.text}
-                </ReactMarkdown>
+                />
               </div>
             </div>
           ))}
@@ -288,14 +286,16 @@ function App() {
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') askQuestion(); }}
+            onKeyDown={(e) => e.key === 'Enter' && askQuestion()}
+            placeholder="Ask me anything..."
             className="w-full h-full p-3 bg-transparent text-white outline-none"
-            placeholder="Ask me anything..." />
+          />
           <button
             onClick={askQuestion}
             disabled={loading}
-            className={`text-white p-3 rounded-md hover:bg-gray-800 transition ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {loading ? '...' : 'Ask'}
+            className="bg-zinc-800  hover:bg-green-700 px-4 py-2 rounded text-white font-semibold"
+          >
+          {loading ? 'Thinking...' : 'Ask'}
           </button>
         </div>
       </main>
