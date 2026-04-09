@@ -1,0 +1,95 @@
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import API from "../services/api";
+
+const Login = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  if (!form.email || !form.password) {
+    setError("All fields are required");
+    return;
+  }
+  setLoading(true);
+  try {
+    const res = await API.post("/auth/login", form);
+    // ✅ Pass both token AND user object
+    login(res.data.token, res.data.user);
+    navigate("/chat");
+  } catch (err) {
+    setError(err.response?.data?.message || "Invalid credentials");
+  } finally {
+    setLoading(false);
+  }
+};
+  return (
+    <div className="flex justify-center items-center h-screen bg-zinc-900">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-zinc-800 p-6 rounded-lg w-80 space-y-4 shadow-lg"
+      >
+        {/* Logo/Title */}
+        <div className="text-center">
+          <h1 className="text-green-400 text-2xl font-bold">AskIQ</h1>
+          <p className="text-zinc-400 text-sm mt-1">Sign in to continue</p>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500 text-red-400 
+                          text-sm p-2 rounded">
+            {error}
+          </div>
+        )}
+
+        {/* Email */}
+        <input
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          className="w-full p-2 bg-zinc-700 text-white rounded 
+                     focus:outline-none focus:ring-2 focus:ring-green-500"
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+
+        {/* Password */}
+        <input
+          type="password"
+          placeholder="Password"
+          value={form.password}
+          className="w-full p-2 bg-zinc-700 text-white rounded 
+                     focus:outline-none focus:ring-2 focus:ring-green-500"
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+        />
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-800 
+                     disabled:cursor-not-allowed text-white p-2 rounded 
+                     transition-colors font-medium"
+        >
+          {loading ? "Signing in..." : "Login"}
+        </button>
+
+        <p className="text-sm text-center text-zinc-400">
+          Don't have an account?{" "}
+          <Link to="/register" className="text-green-400 hover:underline">
+            Register
+          </Link>
+        </p>
+      </form>
+    </div>
+  );
+};
+
+export default Login;

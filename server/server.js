@@ -1,0 +1,68 @@
+import "./config/env.js";
+import express from "express";
+import cors from "cors";
+import { connectDB } from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
+import ragRoutes from "./routes/ragRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+
+connectDB();
+
+const app = express();
+
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  credentials: true,
+  exposedHeaders: ["X-Chat-Id"],
+}));
+app.use(express.json());
+
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/rag", ragRoutes);
+app.use("/api/chat", chatRoutes);
+
+// ✅ Temporary test route to find working embedding model
+app.get("/test-models", async (req, res) => {
+  try {
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+    const modelsToTry = [
+      "embedding-001",
+      "models/embedding-001",
+      "text-embedding-004",
+      "models/text-embedding-004",
+      "gemini-embedding-exp-03-07",
+      "models/gemini-embedding-exp-03-07"
+    ];
+
+    const results = {};
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.embedContent("test");
+        results[modelName] = "✅ WORKS - dimensions: " + result.embedding.values.length;
+      } catch (e) {
+        results[modelName] = "❌ " + e.message.slice(0, 80);
+      }
+    }
+
+    res.json(results);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: err.message || "Internal server error" });
+});
+
+// Use PORT from .env
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
