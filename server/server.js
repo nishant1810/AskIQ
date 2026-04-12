@@ -6,15 +6,37 @@ import authRoutes from "./routes/authRoutes.js";
 import ragRoutes from "./routes/ragRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 
+// Connect Database
 connectDB();
 
 const app = express();
 
+// ✅ Debug: Check CLIENT_URL
+console.log("CLIENT_URL:", process.env.CLIENT_URL);
+
+// ✅ Allowed origins (local + production)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://ask-iq.vercel.app"
+];
+
+// ✅ CORS configuration (robust)
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  origin: function (origin, callback) {
+    // allow requests with no origin (like Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed: " + origin));
+    }
+  },
   credentials: true,
   exposedHeaders: ["X-Chat-Id"],
 }));
+
+// Middleware
 app.use(express.json());
 
 // Routes
@@ -22,7 +44,12 @@ app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
 app.use("/api/chat", chatRoutes);
 
-// ✅ Temporary test route to find working embedding model
+// ✅ Health check route (VERY USEFUL)
+app.get("/", (req, res) => {
+  res.send("API is running successfully 🚀");
+});
+
+// ✅ Test route for embedding models (your existing code)
 app.get("/test-models", async (req, res) => {
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
@@ -43,9 +70,11 @@ app.get("/test-models", async (req, res) => {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.embedContent("test");
-        results[modelName] = "✅ WORKS - dimensions: " + result.embedding.values.length;
+        results[modelName] =
+          "✅ WORKS - dimensions: " + result.embedding.values.length;
       } catch (e) {
-        results[modelName] = "❌ " + e.message.slice(0, 80);
+        results[modelName] =
+          "❌ " + e.message.slice(0, 80);
       }
     }
 
@@ -55,14 +84,18 @@ app.get("/test-models", async (req, res) => {
   }
 });
 
-// Global error handler
+// ✅ Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message || "Internal server error" });
+  console.error("ERROR:", err.message);
+  res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
 });
 
-// Use PORT from .env
+// ✅ Start server (Render compatible)
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
