@@ -20,7 +20,7 @@ const Login = () => {
   }
   setLoading(true);
   try {
-    const res = await API.post("/auth/login", form);
+    const res = await API.post("/api/auth/login", form);
     // ✅ Pass both token AND user object
     login(res.data.token, res.data.user);
     navigate("/chat");

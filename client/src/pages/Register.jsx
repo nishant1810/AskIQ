@@ -27,7 +27,7 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const res = await API.post("/auth/register", form);
+      const res = await API.post("/api/auth/register", form);
       // ✅ Auto login after register
       login(res.data.token, res.data.user);
       navigate("/chat");
