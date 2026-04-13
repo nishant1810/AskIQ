@@ -9,7 +9,7 @@ GlobalWorkerOptions.workerSrc = "";
 import { chunkText } from "../services/chunkService.js";
 import { generateEmbedding } from "../services/embeddingService.js";
 import { upsertVector, queryVector, deleteVectors } from "../services/vectorService.js"; // ✅ single import
-import { generateAnswerStream } from "../services/llmService.js";
+import { generateAnswer } from "../services/llmService.js";
 import Chat from "../models/Chat.js";
 import Document from "../models/Document.js";
 
