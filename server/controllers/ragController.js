@@ -194,7 +194,7 @@ User question: ${question}
     res.setHeader("Transfer-Encoding", "chunked");
     res.setHeader("X-Chat-Id", chat._id.toString());
 
-    const fullAnswer = await generateAnswerStream(finalPrompt, (chunk) => {
+    const fullAnswer = await generateAnswer(finalPrompt, (chunk) => {
       res.write(chunk);
     });
 
