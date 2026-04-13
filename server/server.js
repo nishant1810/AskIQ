@@ -7,6 +7,7 @@ import ragRoutes from "./routes/ragRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 
 // Connect Database
+// Connect Database
 connectDB();
 
 const app = express();
