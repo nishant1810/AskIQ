@@ -14,30 +14,28 @@ const app = express();
 
 // ✅ Debug: Check CLIENT_URL
 console.log("CLIENT_URL:", process.env.CLIENT_URL);
-
-// ✅ Allowed origins (local + production)
-const allowedOrigins = ['*'];
-
-// ✅ CORS configuration (robust)
-// app.use(cors({
-//   origin: function (origin, callback) {
-//     // allow requests with no origin (like Postman)
-//     if (!origin) return callback(null, true);
-
-//     if (allowedOrigins.includes(origin)) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error("CORS not allowed: " + origin));
-//     }
-//   },
-//   credentials: true,
-//   exposedHeaders: ["X-Chat-Id"],
-// }));
+const allowedOrigins = [
+  "http://localhost:5173", // local dev (Vite)
+  "https://ask-iq.vercel.app" // your deployed frontend
+];
 
 app.use(cors({
-  origin: "https://ask-iq.vercel.app",
-  credentials: true
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS not allowed: " + origin));
+  },
+  credentials: true,
 }));
+
+// app.use(cors({
+//   origin: "https://ask-iq.vercel.app",
+//   credentials: true
+// }));
 
 // Middleware
 app.use(express.json());
