@@ -22,7 +22,7 @@ const ChatBox = ({ chatId, setChatId }) => {
     try {
       // ✅ Streaming fetch
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/rag/ask`,
+        `${import.meta.env.VITE_API_URL}/rag/ask`,
         {
           method: "POST",
           headers: {
