@@ -43,7 +43,7 @@ const FileUpload = ({ onUploadSuccess }) => {
     formData.append("file", file);
 
     try {
-      const res = await API.post("/rag/upload", formData, {
+      const res = await API.post("/api/rag/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => {
           const percent = Math.round((e.loaded * 100) / e.total);
