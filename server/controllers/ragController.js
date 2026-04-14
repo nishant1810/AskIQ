@@ -13,44 +13,32 @@ import { generateAnswer } from "../services/llmService.js";
 import Chat from "../models/Chat.js";
 import Document from "../models/Document.js";
 
-// ================= MULTER CONFIG =================
+// ================= MULTER =================
 const upload = multer({
   dest: "uploads/",
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = [".pdf", ".txt"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF and TXT files are allowed"));
-    }
-  },
 });
 
 export const uploadMiddleware = upload.single("file");
 
-// ================= PDF TEXT EXTRACTION =================
+// ================= PDF TEXT =================
 async function extractTextFromPDF(filePath) {
   const data = new Uint8Array(fs.readFileSync(filePath));
-  const loadingTask = getDocument({
-    data,
-    standardFontDataUrl: null,
-    disableFontFace: true,
-  });
-  const pdf = await loadingTask.promise;
+  const pdf = await getDocument({ data }).promise;
+
   let text = "";
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     text += content.items.map((item) => item.str).join(" ") + "\n";
   }
+
   return text;
 }
 
-// ================= UPLOAD DOCUMENT =================
+// ================= UPLOAD =================
 export const uploadDocument = async (req, res) => {
-  let filePath = req.file?.path;
+  const filePath = req.file?.path;
 
   try {
     if (!req.file) {
@@ -60,47 +48,30 @@ export const uploadDocument = async (req, res) => {
     const doc = await Document.create({
       userId: req.user.id,
       fileName: req.file.originalname,
-      fileType: path.extname(req.file.originalname).replace(".", ""),
-      fileSize: req.file.size,
       status: "processing",
       pineconeNamespace: `user-${req.user.id}`,
     });
 
-    const extractedText =
-      doc.fileType === "pdf"
+    const text =
+      req.file.originalname.endsWith(".pdf")
         ? await extractTextFromPDF(filePath)
         : fs.readFileSync(filePath, "utf-8");
 
-    if (!extractedText.trim()) {
-      await Document.findByIdAndUpdate(doc._id, { status: "failed" });
-      return res.status(400).json({ message: "Could not extract text from file" });
-    }
-
-    const chunks = chunkText(extractedText, 1000, 200);
+    const chunks = chunkText(text, 1000, 200);
     const namespace = `user-${req.user.id}`;
 
-    console.log(`Processing ${chunks.length} chunks...`);
-
     for (let i = 0; i < chunks.length; i++) {
-      try {
-        const embedding = await generateEmbedding(chunks[i]);
+      const embedding = await generateEmbedding(chunks[i]);
 
-        await upsertVector(
-          `${doc._id}-chunk-${i}`,
-          embedding,
-          {
-            text: chunks[i],
-            userId: req.user.id,
-            docId: doc._id.toString(),
-          },
-          namespace
-        );
-
-        console.log(`✅ Chunk ${i + 1}/${chunks.length}`);
-      } catch (err) {
-        console.error("❌ EMBEDDING ERROR:", err);
-        throw err;
-      }
+      await upsertVector(
+        `${doc._id}-${i}`,
+        embedding,
+        {
+          text: chunks[i],
+          userId: req.user.id,
+        },
+        namespace
+      );
     }
 
     await Document.findByIdAndUpdate(doc._id, {
@@ -110,69 +81,59 @@ export const uploadDocument = async (req, res) => {
 
     fs.unlinkSync(filePath);
 
-    res.json({
-      message: "Document indexed successfully",
-      document: {
-        id: doc._id,
-        fileName: doc.fileName,
-        chunkCount: chunks.length,
-      },
-    });
+    res.json({ message: "Upload successful" });
 
-  } catch (error) {
-    console.error("Upload error:", error);
+  } catch (err) {
+    console.error("UPLOAD ERROR:", err);
 
     if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
-    res.status(500).json({
-      message: "Upload failed",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Upload failed", error: err.message });
   }
 };
 
-// ================= ASK QUESTION =================
+// ================= ASK =================
 export const askQuestion = async (req, res) => {
   try {
     const { question, chatId } = req.body;
 
-    if (!question?.trim()) {
-      return res.status(400).json({ message: "Question is required" });
+    if (!question) {
+      return res.status(400).json({ message: "Question required" });
     }
 
     const namespace = `user-${req.user.id}`;
 
+    // ✅ Embedding
     const questionEmbedding = await generateEmbedding(question);
-    const matches = await queryVector(questionEmbedding, namespace, req.user.id);
 
-    const context = matches?.map((m) => m.metadata.text).join("\n") || "";
+    // ✅ Vector search
+    const matches = await queryVector(questionEmbedding, namespace);
 
-    let chat;
+    const context = matches
+      ?.map((m) => m.metadata.text)
+      .join("\n") || "No context";
 
-    if (chatId) {
-      chat = await Chat.findOne({ _id: chatId, userId: req.user.id });
-    }
+    // ✅ Chat
+    let chat = chatId
+      ? await Chat.findById(chatId)
+      : await Chat.create({
+          userId: req.user.id,
+          title: question.slice(0, 50),
+          messages: [],
+        });
 
-    if (!chat) {
-      chat = await Chat.create({
-        userId: req.user.id,
-        title: question.slice(0, 50),
-        messages: [],
-      });
-    }
-
-    const finalPrompt = `
+    const prompt = `
 Context:
-${context || "No document context."}
+${context}
 
 Question:
 ${question}
 `;
 
-    // ✅ FIXED (no streaming)
-    const answer = await generateAnswer(finalPrompt);
+    // ✅ LLM
+    const answer = await generateAnswer(prompt);
 
     chat.messages.push({ role: "user", content: question });
     chat.messages.push({ role: "assistant", content: answer });
@@ -185,7 +146,7 @@ ${question}
     });
 
   } catch (error) {
-    console.error("Ask error:", error);
+    console.error("ASK ERROR:", error);
 
     res.status(500).json({
       message: "Failed to generate answer",
@@ -194,37 +155,19 @@ ${question}
   }
 };
 
-// ================= DELETE DOCUMENT =================
-export const deleteDocument = async (req, res) => {
-  try {
-    const doc = await Document.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
-
-    if (!doc) {
-      return res.status(404).json({ message: "Document not found" });
-    }
-
-    await deleteVectors(doc._id.toString(), `user-${req.user.id}`);
-
-    res.json({ message: "Document deleted successfully" });
-
-  } catch (error) {
-    console.error("Delete error:", error);
-    res.status(500).json({ message: "Failed to delete document" });
-  }
+// ================= GET DOCS =================
+export const getDocuments = async (req, res) => {
+  const docs = await Document.find({ userId: req.user.id });
+  res.json(docs);
 };
 
-// ================= GET DOCUMENTS =================
-export const getDocuments = async (req, res) => {
-  try {
-    const documents = await Document.find({ userId: req.user.id })
-      .sort({ createdAt: -1 });
+// ================= DELETE =================
+export const deleteDocument = async (req, res) => {
+  const doc = await Document.findByIdAndDelete(req.params.id);
 
-    res.json(documents);
-
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch documents" });
+  if (doc) {
+    await deleteVectors(doc._id.toString(), `user-${req.user.id}`);
   }
+
+  res.json({ message: "Deleted" });
 };

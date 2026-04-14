@@ -1,18 +1,8 @@
-import { pipeline } from "@xenova/transformers";
+import OpenAI from "openai";
 
-let embedder = null;
-
-const getEmbedder = async () => {
-  if (!embedder) {
-    console.log("⏳ Loading embedding model...");
-    embedder = await pipeline(
-      "feature-extraction",
-      "Xenova/all-MiniLM-L6-v2"
-    );
-    console.log("✅ Embedding model ready!");
-  }
-  return embedder;
-};
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export const generateEmbedding = async (text) => {
   try {
@@ -20,28 +10,15 @@ export const generateEmbedding = async (text) => {
       throw new Error("Invalid text input");
     }
 
-    const trimmed = text.slice(0, 8000);
-    const extractor = await getEmbedder();
-
-    const output = await extractor(trimmed, {
-      pooling: "mean",
-      normalize: true,
+    const res = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: text.slice(0, 8000),
     });
 
-    // ✅ Convert to plain array
-    const result = Array.from(output.data);
-
-    // ✅ Validate output
-    if (!result || result.length === 0) {
-      throw new Error("Empty embedding returned from model");
-    }
-
-    console.log(`🔢 Embedding generated: ${result.length} dimensions`);
-
-    return result;
+    return res.data[0].embedding;
 
   } catch (error) {
-    console.error("Embedding error:", error.message);
+    console.error("EMBEDDING ERROR:", error.message);
     throw error;
   }
 };
