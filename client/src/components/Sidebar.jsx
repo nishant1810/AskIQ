@@ -58,14 +58,14 @@ export default function Sidebar({
   const fetchChats = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await API.get("/chat");
+      const res = await API.get("/api/chat");
       setChats(res.data || []);
     } catch {} finally { setLoading(false); }
   }, []);
 
   const fetchDocs = useCallback(async () => {
     try {
-      const res = await API.get("/rag/documents");
+      const res = await API.get("/api/rag/documents");
       setDocuments(res.data || []);
     } catch {}
   }, []);
@@ -75,7 +75,7 @@ export default function Sidebar({
   const deleteChat = async (e, id) => {
     e.stopPropagation();
     try {
-      await API.delete(`/chat/${id}`);
+      await API.delete(`/api/chat/${id}`);
       setChats((p) => p.filter((c) => c._id !== id));
       if (currentChatId === id) onNewChat();
     } catch {}
@@ -84,7 +84,7 @@ export default function Sidebar({
   const deleteDocument = async (e, id) => {
     e.stopPropagation();
     try {
-      await API.delete(`/rag/documents/${id}`);
+      await API.delete(`/api/rag/documents/${id}`);
       setDocuments((p) => p.filter((d) => d._id !== id));
     } catch {
       console.error("Failed to delete document");
