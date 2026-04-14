@@ -54,7 +54,7 @@ export default function ChatPage() {
     setMessages(p => [...p, { role: "assistant", content: "" }]);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/rag/ask`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/rag/ask`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
