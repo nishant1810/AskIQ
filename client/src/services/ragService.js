@@ -8,4 +8,4 @@ export const uploadDocument = (formData) =>
 export const askQuestion = (question, chatId) =>
   API.post("/rag/ask", { question, chatId });
 
-export const getDocuments = () => API.get("/rag/documents");
+export const getDocuments = () => API.get("/api/rag/documents");
