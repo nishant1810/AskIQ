@@ -45,6 +45,10 @@ export const uploadDocument = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    if (!req.user?.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const doc = await Document.create({
       userId: req.user.id,
       fileName: req.file.originalname,
@@ -57,21 +61,30 @@ export const uploadDocument = async (req, res) => {
         ? await extractTextFromPDF(filePath)
         : fs.readFileSync(filePath, "utf-8");
 
+    if (!text || !text.trim()) {
+      throw new Error("Empty document content");
+    }
+
     const chunks = chunkText(text, 1000, 200);
     const namespace = `user-${req.user.id}`;
 
     for (let i = 0; i < chunks.length; i++) {
-      const embedding = await generateEmbedding(chunks[i]);
+      try {
+        const embedding = await generateEmbedding(chunks[i]);
 
-      await upsertVector(
-        `${doc._id}-${i}`,
-        embedding,
-        {
-          text: chunks[i],
-          userId: req.user.id,
-        },
-        namespace
-      );
+        await upsertVector(
+          `${doc._id}-${i}`,
+          embedding,
+          {
+            text: chunks[i],
+            userId: req.user.id,
+          },
+          namespace
+        );
+      } catch (err) {
+        console.error("❌ EMBEDDING ERROR:", err.message);
+        throw err;
+      }
     }
 
     await Document.findByIdAndUpdate(doc._id, {
@@ -79,7 +92,9 @@ export const uploadDocument = async (req, res) => {
       chunkCount: chunks.length,
     });
 
-    fs.unlinkSync(filePath);
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
 
     res.json({ message: "Upload successful" });
 
@@ -90,7 +105,10 @@ export const uploadDocument = async (req, res) => {
       fs.unlinkSync(filePath);
     }
 
-    res.status(500).json({ message: "Upload failed", error: err.message });
+    res.status(500).json({
+      message: "Upload failed",
+      error: err.message,
+    });
   }
 };
 
@@ -99,30 +117,52 @@ export const askQuestion = async (req, res) => {
   try {
     const { question, chatId } = req.body;
 
-    if (!question) {
+    if (!question?.trim()) {
       return res.status(400).json({ message: "Question required" });
+    }
+
+    if (!req.user?.id) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     const namespace = `user-${req.user.id}`;
 
     // ✅ Embedding
-    const questionEmbedding = await generateEmbedding(question);
+    let questionEmbedding;
+    try {
+      questionEmbedding = await generateEmbedding(question);
+    } catch (err) {
+      console.error("❌ EMBEDDING FAILED:", err.message);
+      return res.status(500).json({ message: "Embedding failed" });
+    }
 
-    // ✅ Vector search
-    const matches = await queryVector(questionEmbedding, namespace);
+    // ✅ Vector Search
+    let matches = [];
+    try {
+      matches = await queryVector(questionEmbedding, namespace);
+    } catch (err) {
+      console.error("❌ VECTOR SEARCH FAILED:", err.message);
+      return res.status(500).json({ message: "Vector search failed" });
+    }
 
-    const context = matches
-      ?.map((m) => m.metadata.text)
-      .join("\n") || "No context";
+    const context =
+      matches?.map((m) => m.metadata?.text || "").join("\n") ||
+      "No relevant context found.";
 
-    // ✅ Chat
-    let chat = chatId
-      ? await Chat.findById(chatId)
-      : await Chat.create({
-          userId: req.user.id,
-          title: question.slice(0, 50),
-          messages: [],
-        });
+    // ✅ Chat Handling
+    let chat = null;
+
+    if (chatId) {
+      chat = await Chat.findOne({ _id: chatId, userId: req.user.id });
+    }
+
+    if (!chat) {
+      chat = await Chat.create({
+        userId: req.user.id,
+        title: question.slice(0, 50),
+        messages: [],
+      });
+    }
 
     const prompt = `
 Context:
@@ -132,8 +172,14 @@ Question:
 ${question}
 `;
 
-    // ✅ LLM
-    const answer = await generateAnswer(prompt);
+    // ✅ LLM (Groq)
+    let answer;
+    try {
+      answer = await generateAnswer(prompt);
+    } catch (err) {
+      console.error("❌ LLM ERROR:", err.message);
+      return res.status(500).json({ message: "LLM failed" });
+    }
 
     chat.messages.push({ role: "user", content: question });
     chat.messages.push({ role: "assistant", content: answer });
@@ -157,17 +203,32 @@ ${question}
 
 // ================= GET DOCS =================
 export const getDocuments = async (req, res) => {
-  const docs = await Document.find({ userId: req.user.id });
-  res.json(docs);
+  try {
+    const docs = await Document.find({ userId: req.user.id });
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch documents" });
+  }
 };
 
 // ================= DELETE =================
 export const deleteDocument = async (req, res) => {
-  const doc = await Document.findByIdAndDelete(req.params.id);
+  try {
+    const doc = await Document.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user.id,
+    });
 
-  if (doc) {
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
     await deleteVectors(doc._id.toString(), `user-${req.user.id}`);
-  }
 
-  res.json({ message: "Deleted" });
+    res.json({ message: "Deleted successfully" });
+
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
+    res.status(500).json({ message: "Delete failed" });
+  }
 };

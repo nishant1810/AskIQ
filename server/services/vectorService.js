@@ -1,35 +1,46 @@
 import { getPineconeIndex } from "../config/pinecone.js";
 
-export const upsertVector = async (id, values, metadata, namespace = "default") => {
+// ================= UPSERT =================
+export const upsertVector = async (
+  id,
+  values,
+  metadata,
+  namespace = "default"
+) => {
   try {
-    console.log(`📌 Upserting — ID: ${id}, dimensions: ${values.length}`);
+    if (!values || !Array.isArray(values) || values.length === 0) {
+      throw new Error("Invalid embedding vector");
+    }
 
     const index = getPineconeIndex();
 
-    // ✅ SDK v7 expects { records: [...] } format
-    await index.namespace(namespace).upsert({
-      records: [
-        {
-          id: String(id),
-          values: [...values],
-          metadata: {
-            text: String(metadata.text || ""),
-            userId: String(metadata.userId || ""),
-            docId: String(metadata.docId || ""),
-          },
+    console.log(`📌 Upserting — ID: ${id}, dim: ${values.length}`);
+
+    await index.namespace(namespace).upsert([
+      {
+        id: String(id),
+        values: values,
+        metadata: {
+          text: String(metadata?.text || ""),
+          userId: String(metadata?.userId || ""),
+          docId: String(metadata?.docId || ""),
         },
-      ],
-    });
+      },
+    ]);
 
-    console.log(`✅ Upserted successfully: ${id}`);
-
+    console.log(`✅ Upserted: ${id}`);
   } catch (error) {
-    console.error("Upsert error:", error.message);
+    console.error("❌ UPSERT ERROR:", error.message);
     throw error;
   }
 };
 
-export const queryVector = async (values, namespace = "default", userId = null) => {
+// ================= QUERY =================
+export const queryVector = async (
+  values,
+  namespace = "default",
+  userId = null
+) => {
   try {
     if (!values || !Array.isArray(values) || values.length === 0) {
       throw new Error("Invalid query vector");
@@ -37,33 +48,47 @@ export const queryVector = async (values, namespace = "default", userId = null) 
 
     const index = getPineconeIndex();
 
-    const queryOptions = {
-      vector: [...values],
+    const query = {
+      vector: values,
       topK: 5,
       includeMetadata: true,
     };
 
     if (userId) {
-      queryOptions.filter = { userId: { $eq: String(userId) } };
+      query.filter = {
+        userId: { $eq: String(userId) },
+      };
     }
 
-    const result = await index.namespace(namespace).query(queryOptions);
-    return result.matches || [];
+    const result = await index.namespace(namespace).query(query);
 
+    console.log(`🔍 Matches found: ${result.matches?.length || 0}`);
+
+    return result.matches || [];
   } catch (error) {
-    console.error("Query error:", error.message);
+    console.error("❌ QUERY ERROR:", error.message);
     throw error;
   }
 };
 
-export const deleteVectors = async (docId, namespace = "default") => {
+// ================= DELETE =================
+export const deleteVectors = async (
+  docId,
+  namespace = "default"
+) => {
   try {
     const index = getPineconeIndex();
-    await index.namespace(namespace).deleteMany({
-      docId: { $eq: String(docId) }
+
+    // ✅ Correct way: delete using filter
+    await index.namespace(namespace).delete({
+      filter: {
+        docId: { $eq: String(docId) },
+      },
     });
+
+    console.log(`🗑️ Deleted vectors for doc: ${docId}`);
   } catch (error) {
-    console.error("Delete vectors error:", error.message);
+    console.error("❌ DELETE ERROR:", error.message);
     throw error;
   }
 };

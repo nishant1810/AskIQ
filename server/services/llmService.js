@@ -1,7 +1,7 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 const SYSTEM_INSTRUCTION = `
@@ -11,8 +11,8 @@ Answer clearly and based on provided context.
 
 export const generateAnswer = async (prompt) => {
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       messages: [
         { role: "system", content: SYSTEM_INSTRUCTION },
         { role: "user", content: prompt },
@@ -22,7 +22,7 @@ export const generateAnswer = async (prompt) => {
     return completion.choices[0]?.message?.content || "No response";
 
   } catch (error) {
-    console.error("LLM ERROR:", error.message);
+    console.error("GROQ ERROR:", error.message);
     throw error;
   }
 };
