@@ -8,6 +8,7 @@ export const upsertVector = async (
   namespace = "default"
 ) => {
   try {
+    // ✅ Validate vector
     if (!values || !Array.isArray(values) || values.length === 0) {
       throw new Error("Invalid embedding vector");
     }
@@ -16,19 +17,25 @@ export const upsertVector = async (
 
     console.log(`📌 Upserting — ID: ${id}, dim: ${values.length}`);
 
-    await index.namespace(namespace).upsert([
-      {
-        id: String(id),
-        values: values,
-        metadata: {
-          text: String(metadata?.text || ""),
-          userId: String(metadata?.userId || ""),
-          docId: String(metadata?.docId || ""),
-        },
-      },
-    ]);
+    // ✅ Ensure values are plain numbers
+    const cleanValues = values.map((v) => Number(v));
 
-    console.log(`✅ Upserted: ${id}`);
+    const record = {
+      id: String(id),
+      values: cleanValues,
+      metadata: {
+        text: String(metadata?.text || ""),
+        userId: String(metadata?.userId || ""),
+        docId: String(metadata?.docId || ""),
+      },
+    };
+
+    // ✅ CORRECT FOR NEW SDK
+    await index.namespace(namespace).upsert({
+      records: [record],
+    });
+
+    console.log(`✅ Upsert success: ${id}`);
   } catch (error) {
     console.error("❌ UPSERT ERROR:", error.message);
     throw error;
@@ -49,7 +56,7 @@ export const queryVector = async (
     const index = getPineconeIndex();
 
     const query = {
-      vector: values,
+      vector: values.map((v) => Number(v)),
       topK: 5,
       includeMetadata: true,
     };
@@ -79,7 +86,6 @@ export const deleteVectors = async (
   try {
     const index = getPineconeIndex();
 
-    // ✅ Correct way: delete using filter
     await index.namespace(namespace).delete({
       filter: {
         docId: { $eq: String(docId) },
