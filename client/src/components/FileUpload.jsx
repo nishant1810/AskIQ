@@ -62,7 +62,7 @@ const FileUpload = ({ onUploadSuccess }) => {
       // ✅ Notify parent
       if (onUploadSuccess) onUploadSuccess(res.data.document);
 
-    } catch (err) {
+    } catch (err) {console.error(err);
       setError(err.response?.data?.message || "Upload failed. Please try again.");
     } finally {
       setUploading(false);
