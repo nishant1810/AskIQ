@@ -1,6 +1,5 @@
 import multer from "multer";
 import fs from "fs";
-import path from "path";
 import pkg from "pdfjs-dist/legacy/build/pdf.js";
 
 const { getDocument, GlobalWorkerOptions } = pkg;
@@ -8,7 +7,11 @@ GlobalWorkerOptions.workerSrc = "";
 
 import { chunkText } from "../services/chunkService.js";
 import { generateEmbedding } from "../services/embeddingService.js";
-import { upsertVector, queryVector, deleteVectors } from "../services/vectorService.js";
+import {
+  upsertVector,
+  queryVector,
+  deleteVectors,
+} from "../services/vectorService.js";
 import { generateAnswer } from "../services/llmService.js";
 import Chat from "../models/Chat.js";
 import Document from "../models/Document.js";
@@ -49,13 +52,16 @@ export const uploadDocument = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    const namespace = `user-${req.user.id}`;
+
     const doc = await Document.create({
       userId: req.user.id,
       fileName: req.file.originalname,
       status: "processing",
-      pineconeNamespace: `user-${req.user.id}`,
+      pineconeNamespace: namespace,
     });
 
+    // ✅ Extract text
     const text =
       req.file.originalname.endsWith(".pdf")
         ? await extractTextFromPDF(filePath)
@@ -65,33 +71,35 @@ export const uploadDocument = async (req, res) => {
       throw new Error("Empty document content");
     }
 
+    // ✅ Chunk
     const chunks = chunkText(text, 1000, 200);
-    const namespace = `user-${req.user.id}`;
+    console.log("📄 Total chunks:", chunks.length);
 
+    // ✅ Embed + Store
     for (let i = 0; i < chunks.length; i++) {
-      try {
-        const embedding = await generateEmbedding(chunks[i]);
+      const embedding = await generateEmbedding(chunks[i]);
 
-        await upsertVector(
-          `${doc._id}-${i}`,
-          embedding,
-          {
-            text: chunks[i],
-            userId: req.user.id,
-          },
-          namespace
-        );
-      } catch (err) {
-        console.error("❌ EMBEDDING ERROR:", err.message);
-        throw err;
-      }
+      console.log(`🔢 Embedding ${i} size:`, embedding.length);
+
+      await upsertVector(
+        `${doc._id}-${i}`,
+        embedding,
+        {
+          text: chunks[i],
+          userId: req.user.id,
+          docId: doc._id.toString(),
+        },
+        namespace
+      );
     }
 
+    // ✅ Update doc
     await Document.findByIdAndUpdate(doc._id, {
       status: "ready",
       chunkCount: chunks.length,
     });
 
+    // ✅ Delete temp file
     if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
@@ -99,7 +107,7 @@ export const uploadDocument = async (req, res) => {
     res.json({ message: "Upload successful" });
 
   } catch (err) {
-    console.error("UPLOAD ERROR:", err);
+    console.error("❌ UPLOAD ERROR:", err.message);
 
     if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -127,33 +135,27 @@ export const askQuestion = async (req, res) => {
 
     const namespace = `user-${req.user.id}`;
 
-    // ✅ Embedding
-    let questionEmbedding;
-    try {
-      questionEmbedding = await generateEmbedding(question);
-    } catch (err) {
-      console.error("❌ EMBEDDING FAILED:", err.message);
-      return res.status(500).json({ message: "Embedding failed" });
-    }
+    // ✅ 1. Generate embedding
+    const questionEmbedding = await generateEmbedding(question);
 
-    // ✅ Vector Search
-    let matches = [];
-    try {
-      matches = await queryVector(questionEmbedding, namespace);
-    } catch (err) {
-      console.error("❌ VECTOR SEARCH FAILED:", err.message);
-      return res.status(500).json({ message: "Vector search failed" });
-    }
+    // ✅ 2. Query Pinecone
+    const matches = await queryVector(questionEmbedding, namespace);
 
+    console.log("🔍 Matches found:", matches.length);
+
+    // ✅ 3. Build context
     const context =
       matches?.map((m) => m.metadata?.text || "").join("\n") ||
       "No relevant context found.";
 
-    // ✅ Chat Handling
+    // ✅ 4. Chat handling
     let chat = null;
 
     if (chatId) {
-      chat = await Chat.findOne({ _id: chatId, userId: req.user.id });
+      chat = await Chat.findOne({
+        _id: chatId,
+        userId: req.user.id,
+      });
     }
 
     if (!chat) {
@@ -164,23 +166,26 @@ export const askQuestion = async (req, res) => {
       });
     }
 
+    // ✅ 5. Strong RAG prompt (IMPORTANT)
     const prompt = `
+You MUST answer using ONLY the context below.
+
 Context:
 ${context}
 
 Question:
 ${question}
+
+Rules:
+- Do NOT make up answers
+- If answer not found, say:
+  "I could not find this in the document."
 `;
 
-    // ✅ LLM (Groq)
-    let answer;
-    try {
-      answer = await generateAnswer(prompt);
-    } catch (err) {
-      console.error("❌ LLM ERROR:", err.message);
-      return res.status(500).json({ message: "LLM failed" });
-    }
+    // ✅ 6. LLM (Groq)
+    const answer = await generateAnswer(prompt);
 
+    // ✅ 7. Save chat
     chat.messages.push({ role: "user", content: question });
     chat.messages.push({ role: "assistant", content: answer });
 
@@ -192,7 +197,7 @@ ${question}
     });
 
   } catch (error) {
-    console.error("ASK ERROR:", error);
+    console.error("❌ ASK ERROR:", error.message);
 
     res.status(500).json({
       message: "Failed to generate answer",
@@ -228,7 +233,7 @@ export const deleteDocument = async (req, res) => {
     res.json({ message: "Deleted successfully" });
 
   } catch (err) {
-    console.error("DELETE ERROR:", err);
+    console.error("❌ DELETE ERROR:", err.message);
     res.status(500).json({ message: "Delete failed" });
   }
 };
