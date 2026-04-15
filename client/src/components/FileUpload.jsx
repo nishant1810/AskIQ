@@ -52,8 +52,8 @@ const FileUpload = ({ onUploadSuccess }) => {
       });
 
       setSuccess(
-        `✅ "${res.data.document.fileName}" indexed successfully! (${res.data.document.chunkCount} chunks)`
-      );
+  `✅ "${res.data.message}"`
+);
       setFile(null);
 
       // ✅ Reset file input
